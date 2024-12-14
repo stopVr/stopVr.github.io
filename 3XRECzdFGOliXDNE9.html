@@ -1,0 +1,1016 @@
+<html><head><base href="https://example.com">
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: #333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
+  
+  #gameCanvas {
+    background: #32CD32;
+    border: 4px solid #444;
+  }
+  
+  .instructions {
+    position: absolute;
+    top: 20px;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-align: center;
+  }
+
+  #gameOverMenu {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.8);
+    padding: 20px;
+    border-radius: 10px;
+    color: white;
+    text-align: center;
+    font-family: Arial, sans-serif;
+  }
+
+  .button {
+    background: #4CAF50;
+    border: none;
+    color: white;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 4px 2px;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  #skillShop {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: rgba(128, 0, 128, 0.8);
+    padding: 10px;
+    border-radius: 5px;
+    color: white;
+    font-family: Arial;
+  }
+
+  .skillPoints {
+    color: #bf7fff;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+
+  #mainMenu {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.9);
+    padding: 30px;
+    border-radius: 10px;
+    color: white;
+    text-align: center;
+    font-family: Arial, sans-serif;
+    min-width: 300px;
+    border: 2px solid #4CAF50;
+    z-index: 1000;
+}
+
+#mainMenu h2 {
+    color: #4CAF50;
+    margin-bottom: 20px;
+}
+
+#mainMenu .button {
+    display: block;
+    width: 100%;
+    margin: 10px 0;
+    background: #2E7D32;
+    transition: background 0.3s;
+}
+
+#mainMenu .button:hover {
+    background: #1B5E20;
+}
+
+#multiplayerStatus {
+    color: #4CAF50;
+    margin: 10px 0;
+    font-weight: bold;
+}
+
+#roomCodeInput {
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid #4CAF50;
+    color: white;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+#roomCodeInput::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+</style>
+</head>
+<body>
+<div class="instructions">Use W A S D keys to move the character</div>
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+<div id="gameOverMenu">
+    <h2>Game Over!</h2>
+    <p>Your Score: <span id="finalScore">0</span></p>
+    <p>Top Score: <span id="topScore">0</span></p>
+    <button class="button" onclick="startNewGame()">Play Again</button>
+</div>
+<div id="scoreShop" style="position: absolute; top: 20px; right: 20px; background: rgba(0, 0, 0, 0.8); padding: 10px; border-radius: 5px; color: white; font-family: Arial;">
+    <div>Multi-Pain (20 score)</div>
+    <button class="button" onclick="purchaseMultiPain()">Buy</button>
+    <div>Laser (10 score)</div>
+    <button class="button" onclick="purchaseLaser()">Buy</button>
+    <div>Extra Life (50 score)</div>
+    <button class="button" onclick="purchaseLife()">Buy</button>
+</div>
+<div id="skillShop">
+    <div class="skillPoints">Skill Points: <span id="skillPointsDisplay">0</span></div>
+    <div>Speed +<span id="speedUpgradeAmount">1</span> (<span id="speedUpgradePrice">1</span> SP)</div>
+    <button class="button" onclick="purchaseSpeedUpgrade()">Buy Speed</button>
+    <div>Score Multi +1 (1 SP)</div>
+    <button class="button" onclick="purchaseScoreUpgrade()">Buy Multi</button>
+</div>
+<div id="mainMenu">
+    <h2>Game Menu</h2>
+    <button class="button" onclick="resumeGame()">Resume Game</button>
+    <button class="button" onclick="startNewGame()">New Game</button>
+    <div style="margin: 20px 0;" class="multiplayer">
+        <h3>Multiplayer</h3>
+        <div id="multiplayerStatus">Not Connected</div>
+        <button class="button" onclick="startMultiplayer()">Create New Room</button>
+        <button class="button" id="copyCodeBtn" style="display: none;" onclick="copyRoomCode()">Copy Room Code</button>
+        <div id="joinRoomDiv"></div>
+    </div>
+    <div style="margin: 20px 0;">
+        <h3>Controls</h3>
+        <p>WASD - Move</p>
+        <p>ESC - Toggle Menu</p>
+    </div>
+    <div style="margin: 20px 0;">
+        <h3>Current Stats</h3>
+        <p>Score: <span id="menuScore">0</span></p>
+        <p>Skill Points: <span id="menuSkillPoints">0</span></p>
+        <p>Lives: <span id="menuLives">0</span></p>
+    </div>
+</div>
+
+<script>
+const BASE_MISSILE_SPEED = 3; // Added constant for base missile speed
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const gameOverMenu = document.getElementById('gameOverMenu');
+const finalScoreSpan = document.getElementById('finalScore');
+const topScoreSpan = document.getElementById('topScore');
+
+let topScore = 0;
+let isGameOver = false;
+let scoreMultiplier = 1;
+let missiles = []; // Array to hold multiple missiles
+let scoreMultipliers = [1]; // Array to hold score multipliers
+let lives = 3; // Added lives variable
+
+let skillPoints = 0;
+let permanentSpeed = 0;
+let permanentScoreMulti = 0;
+let speedUpgradeLevel = 1;
+
+let isPaused = false;
+const mainMenu = document.getElementById('mainMenu');
+
+let room = null;
+let isMultiplayer = false;
+let otherPlayers = new Map(); // Store other players' positions
+
+const player = {
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    width: 30,
+    height: 30,
+    speed: 2.5, // Reduced from 5
+    color: '#FF5733',
+    velocityX: 0,
+    velocityY: 0,
+    acceleration: 0.25, // Reduced from 0.5
+    friction: 0.9
+};
+
+const enemy = {
+    x: 100,
+    y: 100,
+    width: 50,
+    height: 50,
+    color: '#808080'
+};
+
+const missile = {
+    width: 8,  // Slightly narrower
+    height: 24, // Slightly longer
+    speed: BASE_MISSILE_SPEED, // Use base speed here
+    active: false,
+    color: '#FF0000',
+    angle: 0
+};
+
+const nukes = [];
+const upgrades = [];
+const upgradeTypes = [
+    { type: 'speed', color: '#00FF00', duration: 5000, symbol: '⚡' },
+    { type: 'slow', color: '#0000FF', duration: 5000, symbol: '🐌' },
+    { type: 'points', color: '#FFD700', duration: 0, symbol: '+' },
+    { type: 'subtract', color: '#800080', duration: 0, symbol: '-' }
+];
+
+let score = 0;
+let lastScoreUpdate = Date.now();
+let explosionParticles = [];
+
+const keys = {
+    w: false,
+    a: false,
+    s: false,
+    d: false
+};
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        toggleMainMenu();
+        return;
+    }
+    
+    switch (e.key.toLowerCase()) {
+        case 'w': keys.w = true; break;
+        case 'a': keys.a = true; break;
+        case 's': keys.s = true; break;
+        case 'd': keys.d = true; break;
+    }
+});
+
+document.addEventListener('keyup', (e) => {
+    switch (e.key.toLowerCase()) {
+        case 'w': keys.w = false; break;
+        case 'a': keys.a = false; break;
+        case 's': keys.s = false; break;
+        case 'd': keys.d = false; break;
+    }
+});
+
+function toggleMainMenu() {
+    isPaused = !isPaused;
+    mainMenu.style.display = isPaused ? 'block' : 'none';
+    
+    // Update menu stats
+    document.getElementById('menuScore').textContent = Math.floor(score);
+    document.getElementById('menuSkillPoints').textContent = skillPoints;
+    document.getElementById('menuLives').textContent = lives;
+}
+
+function resumeGame() {
+    isPaused = false;
+    mainMenu.style.display = 'none';
+}
+
+function checkSkillPointMilestone() {
+    if (Math.floor(score / 100) > Math.floor((score - 1) / 100)) {
+        skillPoints++;
+        updateSkillDisplay();
+        
+        // Create purple gem effect
+        const gem = document.createElement('div');
+        gem.style.position = 'absolute';
+        gem.style.left = '50%';
+        gem.style.top = '50%';
+        gem.style.transform = 'translate(-50%, -50%)';
+        gem.style.color = '#bf7fff';
+        gem.style.fontSize = '40px';
+        gem.textContent = '💎';
+        gem.style.animation = 'gemFloat 1s ease-out';
+        document.body.appendChild(gem);
+
+        setTimeout(() => document.body.removeChild(gem), 1000);
+    }
+}
+
+function updateSkillDisplay() {
+    document.getElementById('skillPointsDisplay').textContent = skillPoints;
+    document.getElementById('speedUpgradeAmount').textContent = Math.pow(2, speedUpgradeLevel - 1);
+    document.getElementById('speedUpgradePrice').textContent = speedUpgradeLevel;
+}
+
+function purchaseSpeedUpgrade() {
+    if (skillPoints >= speedUpgradeLevel) {
+        skillPoints -= speedUpgradeLevel;
+        permanentSpeed += Math.pow(2, speedUpgradeLevel - 1);
+        speedUpgradeLevel++;
+        player.speed = 2.5 + permanentSpeed;
+        updateSkillDisplay();
+    }
+}
+
+function purchaseScoreUpgrade() {
+    if (skillPoints >= 1) {
+        skillPoints--;
+        permanentScoreMulti++;
+        updateSkillDisplay();
+    }
+}
+
+function createExplosion(x, y) {
+    const particles = [];
+    for (let i = 0; i < 20; i++) {
+        const angle = (Math.PI * 2 * i) / 20;
+        particles.push({
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * 5,
+            vy: Math.sin(angle) * 5,
+            life: 1
+        });
+    }
+    return particles;
+}
+
+function spawnUpgrade() {
+    const type = upgradeTypes[Math.floor(Math.random() * upgradeTypes.length)];
+    upgrades.push({
+        x: Math.random() * (canvas.width - 20),
+        y: Math.random() * (canvas.height - 20),
+        width: 20,
+        height: 20,
+        type: type.type,
+        color: type.color,
+        duration: type.duration,
+        symbol: type.symbol,
+        spawnTime: Date.now() // Add spawn time
+    });
+}
+
+function checkUpgradeTimeout() {
+    const currentTime = Date.now();
+    for (let i = upgrades.length - 1; i >= 0; i--) {
+        if (currentTime - upgrades[i].spawnTime > 10000) { // 10 seconds
+            upgrades.splice(i, 1);
+        }
+    }
+}
+
+function applyUpgrade(upgrade) {
+    screenShake();
+    switch (upgrade.type) {
+        case 'speed':
+            player.speed *= 1.5;
+            setTimeout(() => { player.speed /= 1.5; }, upgrade.duration);
+            break;
+        case 'slow':
+            // Slow down all missiles
+            missiles.forEach(m => m.speed /= 1.5);
+            setTimeout(() => { 
+                missiles.forEach(m => m.speed *= 1.5);
+            }, upgrade.duration);
+            break;
+        case 'points':
+            score += 10 * scoreMultiplier;
+            break;
+        case 'subtract':
+            score = Math.max(0, score - 5);
+            break;
+    }
+}
+
+function checkUpgradeCollision() {
+    for (let i = upgrades.length - 1; i >= 0; i--) {
+        const upgrade = upgrades[i];
+        if (player.x < upgrade.x + upgrade.width &&
+            player.x + player.width > upgrade.x &&
+            player.y < upgrade.y + upgrade.height &&
+            player.y + player.height > upgrade.y) {
+            applyUpgrade(upgrade);
+            upgrades.splice(i, 1);
+        }
+    }
+}
+
+function spawnNuke() {
+    nukes.push({
+        x: Math.random() * (canvas.width - 50),
+        y: Math.random() * (canvas.height - 50),
+        width: 50,
+        height: 50,
+        color: '#FFD700'
+    });
+}
+
+function checkNukeCollision() {
+    for (let i = nukes.length - 1; i >= 0; i--) {
+        const nuke = nukes[i];
+        if (player.x < nuke.x + nuke.width &&
+            player.x + player.width > nuke.x &&
+            player.y < nuke.y + nuke.height &&
+            player.y + player.height > nuke.y) {
+            scoreMultiplier = 2;
+            missile.width *= 3;
+            missile.height *= 3;
+            nukes.splice(i, 1);
+            setTimeout(() => {
+                missile.width /= 3;
+                missile.height /= 3;
+                scoreMultiplier = 1;
+            }, 5000);
+        }
+    }
+}
+
+function repositionEnemy() {
+    enemy.x = Math.random() * (canvas.width - enemy.width);
+    enemy.y = Math.random() * (canvas.height - enemy.height);
+}
+
+function fireMissile() {
+    missiles.push({
+        x: enemy.x + enemy.width / 2,
+        y: enemy.y + enemy.height / 2,
+        width: missile.width,
+        height: missile.height,
+        speed: BASE_MISSILE_SPEED, // Use base speed here
+        active: true,
+        color: missile.color,
+        angle: 0,
+        isOriginal: false
+    });
+}
+
+function showGameOver() {
+    isGameOver = true;
+    gameOverMenu.style.display = 'block';
+    if(score > topScore) {
+        topScore = Math.floor(score);
+    }
+    finalScoreSpan.textContent = Math.floor(score);
+    topScoreSpan.textContent = Math.floor(topScore);
+}
+
+function startNewGame() {
+    isGameOver = false;
+    isPaused = false;
+    mainMenu.style.display = 'none';
+    gameOverMenu.style.display = 'none';
+    score = 0;
+    lives = 3; // Reset lives
+    scoreMultiplier = 1;
+    scoreMultipliers = [1];
+    player.x = canvas.width / 2;
+    player.y = canvas.height / 2;
+    player.speed = 2.5 + permanentSpeed; // Add permanent speed
+    
+    // Reset missile speed when creating the first missile
+    missiles = [{
+        x: enemy.x + enemy.width / 2,
+        y: enemy.y + enemy.height / 2,
+        width: missile.width,
+        height: missile.height,
+        speed: BASE_MISSILE_SPEED, // Use base speed instead of missile.speed
+        active: true,
+        color: missile.color,
+        angle: 0,
+        isOriginal: true
+    }];
+    
+    // Also reset the missile template's speed
+    missile.speed = BASE_MISSILE_SPEED;
+    
+    repositionEnemy();
+    upgrades.length = 0;
+    nukes.length = 0;
+
+    if (isMultiplayer) {
+        otherPlayers.clear();
+    }
+}
+
+function resetGame() {
+    lives--;
+    if (lives <= 0) {
+        explosionParticles = createExplosion(player.x + player.width / 2, player.y + player.height / 2);
+        setTimeout(showGameOver, 1000);
+    } else {
+        // Reset player position but keep score and other upgrades
+        player.x = canvas.width / 2;
+        player.y = canvas.height / 2;
+        player.velocityX = 0;
+        player.velocityY = 0;
+        explosionParticles = createExplosion(player.x + player.width / 2, player.y + player.height / 2);
+        
+        // Reset all missiles to base speed and position
+        missiles.forEach(missile => {
+            missile.x = enemy.x + enemy.width / 2;
+            missile.y = enemy.y + enemy.height / 2;
+            missile.speed = BASE_MISSILE_SPEED; // Reset missile speed to base
+        });
+    }
+}
+
+function updatePlayer() {
+    if (keys.w) player.velocityY -= player.acceleration;
+    if (keys.s) player.velocityY += player.acceleration;
+    if (keys.a) player.velocityX -= player.acceleration;
+    if (keys.d) player.velocityX += player.acceleration;
+    
+    player.velocityX *= player.friction;
+    player.velocityY *= player.friction;
+    
+    player.x += player.velocityX * player.speed;
+    player.y += player.velocityY * player.speed;
+    
+    player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+    player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+}
+
+function updateScore() {
+    if (!isGameOver && !isPaused) {
+        const currentTime = Date.now();
+        if (currentTime - lastScoreUpdate >= 1000) {
+            const missileMultiplier = Math.pow(1.5, missiles.length - 1);
+            const totalMultiplier = scoreMultipliers.reduce((a, b) => a * b, 1);
+            score += 1 * scoreMultiplier * totalMultiplier * missileMultiplier * (1 + permanentScoreMulti);
+            lastScoreUpdate = currentTime;
+            checkSkillPointMilestone();
+        }
+    }
+}
+
+function updateMissile() {
+    missiles.forEach(missile => {
+        if (missile.active) {
+            let dx = player.x + player.width / 2 - missile.x;
+            let dy = player.y + player.height / 2 - missile.y;
+            let distance = Math.sqrt(dx * dx + dy * dy);
+            
+            missile.angle = Math.atan2(dy, dx);
+            
+            let currentSpeed = missile.speed + (score / 20);
+            
+            missile.x += (dx / distance) * currentSpeed;
+            missile.y += (dy / distance) * currentSpeed;
+            
+            if (missile.x < player.x + player.width &&
+                missile.x + missile.width > player.x &&
+                missile.y < player.y + player.height &&
+                missile.y + missile.height > player.y) {
+                resetGame();
+            }
+        }
+    });
+}
+
+function drawMissileTrail() {
+    missiles.forEach(missile => {
+        if (missile.active) {
+            ctx.beginPath();
+            ctx.moveTo(missile.x + missile.width / 2, missile.y + missile.height / 2);
+            ctx.lineTo(
+                missile.x + missile.width / 2 - Math.cos(missile.angle) * 20,
+                missile.y + missile.height / 2 - Math.sin(missile.angle) * 20
+            );
+            ctx.strokeStyle = '#FF6B00';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+    });
+}
+
+// Add shop functions
+function purchaseMultiPain() {
+    if (score >= 20) { // Changed from 200 to 20
+        score -= 20;
+        scoreMultipliers.push(1.5);
+        
+        // Create new missile
+        fireMissile();
+    }
+}
+
+function createLaserEffect() {
+    const lastMissile = missiles[missiles.length - 1];
+    
+    // Create laser beam effect
+    ctx.beginPath();
+    ctx.moveTo(player.x + player.width/2, player.y + player.height/2);
+    ctx.lineTo(lastMissile.x + lastMissile.width/2, lastMissile.y + lastMissile.height/2);
+    ctx.strokeStyle = '#FF0000';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    
+    // Add glow effect
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#FF0000';
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    
+    // Create explosion particles
+    const particles = createExplosion(lastMissile.x, lastMissile.y);
+    explosionParticles.push(...particles);
+    
+    // Screen flash effect
+    const flash = document.createElement('div');
+    flash.style.position = 'fixed';
+    flash.style.top = '0';
+    flash.style.left = '0';
+    flash.style.width = '100%';
+    flash.style.height = '100%';
+    flash.style.backgroundColor = 'rgba(255, 0, 0, 0.3)';
+    flash.style.pointerEvents = 'none';
+    document.body.appendChild(flash);
+    
+    setTimeout(() => {
+        document.body.removeChild(flash);
+    }, 100);
+}
+
+function purchaseLaser() {
+    if (score >= 10 && missiles.length > 1) {
+        score -= 10;
+        // Store missile position before removing
+        const lastMissile = missiles[missiles.length - 1];
+        const missilePos = {x: lastMissile.x, y: lastMissile.y};
+        
+        // Remove the last missile (not the original one)
+        missiles.pop();
+        
+        // Create laser effect
+        createLaserEffect();
+        
+        // Add screen shake
+        screenShake();
+    }
+}
+
+function purchaseLife() {
+    if (score >= 50) {
+        score -= 50;
+        lives++;
+        // Add visual feedback
+        const flash = document.createElement('div');
+        flash.style.position = 'fixed';
+        flash.style.top = '0';
+        flash.style.left = '0';
+        flash.style.width = '100%';
+        flash.style.height = '100%';
+        flash.style.backgroundColor = 'rgba(0, 255, 0, 0.3)';
+        flash.style.pointerEvents = 'none';
+        document.body.appendChild(flash);
+        
+        setTimeout(() => {
+            document.body.removeChild(flash);
+        }, 100);
+    }
+}
+
+function gameLoop() {
+    if (!isGameOver && !isPaused) {
+        updatePlayer();
+        updateMissile();
+        updateScore();
+        checkUpgradeCollision();
+        checkNukeCollision();
+        checkUpgradeTimeout();
+        
+        // Multiplayer
+        if (isMultiplayer && room && !isGameOver && !isPaused) {
+            room.send({
+                type: 'playerPosition',
+                x: player.x,
+                y: player.y,
+                velocityX: player.velocityX,
+                velocityY: player.velocityY,
+                username: room.party.client.username
+            });
+        }
+    }
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw upgrades
+    upgrades.forEach(upgrade => {
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = upgrade.color;
+        ctx.fillStyle = upgrade.color;
+        ctx.fillRect(upgrade.x, upgrade.y, upgrade.width, upgrade.height);
+        ctx.shadowBlur = 0;
+        
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(upgrade.symbol, upgrade.x + upgrade.width / 2, upgrade.y + upgrade.height / 2);
+    });
+    
+    // Draw nukes
+    nukes.forEach(nuke => {
+        ctx.fillStyle = nuke.color;
+        ctx.fillRect(nuke.x, nuke.y, nuke.width, nuke.height);
+    });
+    
+    // Draw enemy
+    ctx.fillStyle = enemy.color;
+    ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+    
+    // Draw enhanced player
+    ctx.save();
+    ctx.translate(player.x + player.width/2, player.y + player.height/2);
+    
+    // Calculate angle based on movement direction
+    let angle = Math.atan2(player.velocityY, player.velocityX);
+    ctx.rotate(angle);
+    
+    // Draw player body
+    ctx.fillStyle = player.color;
+    ctx.beginPath();
+    ctx.moveTo(-player.width/2, -player.height/2);
+    ctx.lineTo(player.width/2, 0);
+    ctx.lineTo(-player.width/2, player.height/2);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Add metallic shine
+    ctx.beginPath();
+    ctx.moveTo(-player.width/4, -player.height/4);
+    ctx.lineTo(player.width/4, 0);
+    ctx.lineTo(-player.width/4, player.height/4);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.fill();
+    
+    // Add thrust effect when moving
+    if (Math.abs(player.velocityX) > 0.1 || Math.abs(player.velocityY) > 0.1) {
+        ctx.beginPath();
+        ctx.moveTo(-player.width/2, -player.height/4);
+        ctx.lineTo(-player.width/2 - 10, 0);
+        ctx.lineTo(-player.width/2, player.height/4);
+        ctx.closePath();
+        ctx.fillStyle = '#FFA500';
+        ctx.fill();
+    }
+    
+    ctx.restore();
+    
+    // Draw missile drawing
+    missiles.forEach(missile => {
+        // Draw missile body
+        ctx.save();
+        ctx.translate(missile.x + missile.width/2, missile.y + missile.height/2);
+        ctx.rotate(missile.angle + Math.PI/2);
+        
+        // Main body (gray)
+        ctx.fillStyle = '#808080';
+        ctx.fillRect(-missile.width/2, -missile.height/2, missile.width, missile.height);
+        
+        // Nose cone (red)
+        ctx.fillStyle = '#FF0000';
+        ctx.beginPath();
+        ctx.moveTo(-missile.width/2, -missile.height/2);
+        ctx.lineTo(0, -missile.height/2 - 10);
+        ctx.lineTo(missile.width/2, -missile.height/2);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Fins (dark gray)
+        ctx.fillStyle = '#4A4A4A';
+        // Left fin
+        ctx.beginPath();
+        ctx.moveTo(-missile.width/2, missile.height/2);
+        ctx.lineTo(-missile.width/2 - 8, missile.height/2 + 8);
+        ctx.lineTo(-missile.width/2, missile.height/2 - 8);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Right fin
+        ctx.beginPath();
+        ctx.moveTo(missile.width/2, missile.height/2);
+        ctx.lineTo(missile.width/2 + 8, missile.height/2 + 8);
+        ctx.lineTo(missile.width/2, missile.height/2 - 8);
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.restore();
+    });
+    
+    // Draw explosion particles
+    if (explosionParticles.length > 0) {
+        ctx.fillStyle = '#FF4500';
+        explosionParticles.forEach((particle, index) => {
+            particle.x += particle.vx;
+            particle.y += particle.vy;
+            particle.life -= 0.02;
+            
+            if (particle.life <= 0) {
+                explosionParticles.splice(index, 1);
+            } else {
+                const size = particle.life * 10;
+                ctx.globalAlpha = particle.life;
+                ctx.fillRect(particle.x - size / 2, particle.y - size / 2, size, size);
+                ctx.globalAlpha = 1;
+            }
+        });
+    }
+
+    // Draw score and lives
+    ctx.fillStyle = 'white';
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'right';
+    ctx.fillText(`Score: ${Math.floor(score)}`, canvas.width - 20, 40);
+    ctx.fillStyle = 'white';
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Lives: ${lives}`, 20, 40);
+    
+    // Draw other players if multiplayer
+    if (isMultiplayer) {
+        otherPlayers.forEach((otherPlayer, clientId) => {
+            ctx.save();
+            ctx.translate(otherPlayer.x + player.width/2, otherPlayer.y + player.height/2);
+            
+            // Calculate angle based on movement direction
+            let angle = Math.atan2(otherPlayer.velocityY, otherPlayer.velocityX);
+            ctx.rotate(angle);
+            
+            // Draw player body in a different color
+            ctx.fillStyle = '#33FF33'; // Green color for other players
+            ctx.beginPath();
+            ctx.moveTo(-player.width/2, -player.height/2);
+            ctx.lineTo(player.width/2, 0);
+            ctx.lineTo(-player.width/2, player.height/2);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Add username above player
+            ctx.fillStyle = 'white';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(otherPlayer.username, 0, -player.height);
+            
+            ctx.restore();
+        });
+    }
+}
+
+function screenShake() {
+    const intensity = 5;
+    canvas.style.transform = `translate(${Math.random() * intensity - intensity / 2}px, ${Math.random() * intensity - intensity / 2}px)`;
+    setTimeout(() => {
+        canvas.style.transform = 'translate(0, 0)';
+    }, 100);
+}
+
+setTimeout(fireMissile, 100);
+
+setInterval(() => {
+    if (!missile.active) {
+        fireMissile();
+    }
+}, 30000);
+
+// Spawn upgrades every 10 seconds
+setInterval(spawnUpgrade, 10000);
+
+// Spawn nukes every 20 seconds
+setInterval(spawnNuke, 20000);
+
+const style = document.createElement('style');
+style.textContent = `
+@keyframes gemFloat {
+    0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+    50% { transform: translate(-50%, -100%) scale(1.5); opacity: 1; }
+    100% { transform: translate(-50%, -150%) scale(1); opacity: 0; }
+}
+`;
+document.head.appendChild(style);
+
+function startMultiplayer() {
+    if (!room) {
+        room = new WebsimSocket();
+        isMultiplayer = true;
+        // Generate a 4 digit code from the room id
+        const roomCode = Math.floor(Math.random() * 9000 + 1000).toString();
+        room.send({
+            type: 'setRoomCode',
+            code: roomCode
+        });
+        document.getElementById('multiplayerStatus').textContent = 'Connected! Room Code: ' + roomCode;
+        document.getElementById('copyCodeBtn').style.display = 'block';
+
+        // Add input for joining room
+        const joinRoomDiv = document.createElement('div');
+        joinRoomDiv.innerHTML = `
+            <input type="text" id="roomCodeInput" maxlength="4" placeholder="Enter 4-digit code"
+                style="padding: 5px; margin: 10px 0; width: 150px; text-align: center;">
+            <button class="button" onclick="joinRoom()">Join Room</button>
+        `;
+        document.querySelector('#mainMenu .multiplayer').appendChild(joinRoomDiv);
+
+        // Handle incoming player positions and room codes
+        room.onmessage = (event) => {
+            const data = event.data;
+            switch (data.type) {
+                case 'playerPosition':
+                    if (data.clientId !== room.party.client.id) {
+                        otherPlayers.set(data.clientId, {
+                            x: data.x,
+                            y: data.y,
+                            velocityX: data.velocityX,
+                            velocityY: data.velocityY,
+                            username: data.username
+                        });
+                    }
+                    break;
+                case 'disconnected':
+                    otherPlayers.delete(data.clientId);
+                    break;
+                case 'setRoomCode':
+                    room.roomCode = data.code;
+                    document.getElementById('multiplayerStatus').textContent = 'Connected! Room Code: ' + data.code;
+                    break;
+            }
+        };
+    }
+}
+
+// Add this new function for joining rooms
+function joinRoom() {
+    const codeInput = document.getElementById('roomCodeInput');
+    const code = codeInput.value;
+    
+    if (code.length !== 4 || isNaN(code)) {
+        alert('Please enter a valid 4-digit code');
+        return;
+    }
+
+    if (!room) {
+        room = new WebsimSocket();
+        isMultiplayer = true;
+        
+        room.send({
+            type: 'joinRoom',
+            code: code
+        });
+
+        // Handle incoming messages for the joining player
+        room.onmessage = (event) => {
+            const data = event.data;
+            switch (data.type) {
+                case 'playerPosition':
+                    if (data.clientId !== room.party.client.id) {
+                        otherPlayers.set(data.clientId, {
+                            x: data.x,
+                            y: data.y,
+                            velocityX: data.velocityX,
+                            velocityY: data.velocityY,
+                            username: data.username
+                        });
+                    }
+                    break;
+                case 'disconnected':
+                    otherPlayers.delete(data.clientId);
+                    break;
+                case 'roomJoined':
+                    document.getElementById('multiplayerStatus').textContent = 'Connected to room: ' + code;
+                    break;
+                case 'roomNotFound':
+                    alert('Room not found. Please check the code and try again.');
+                    room = null;
+                    isMultiplayer = false;
+                    break;
+            }
+        };
+    }
+}
+
+function copyRoomCode() {
+    if (room && room.roomCode) {
+        navigator.clipboard.writeText(room.roomCode);
+        alert('Room code copied to clipboard!');
+    }
+}
+
+startNewGame();
+gameLoop();
+</script>
+</body>
+</html>
